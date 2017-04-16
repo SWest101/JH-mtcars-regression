@@ -1,0 +1,95 @@
+---
+title: "Statistical Exploration of Tranmission Type on Miles Per Gallon"
+author: "Shaun"
+date: "April 10, 2017"
+output: html_document
+---
+
+# Summary
+
+```{r echo=TRUE}
+# Loading the required libraries
+suppressMessages(library(datasets))
+suppressMessages(library(ggplot2))
+suppressMessages(library(GGally))
+
+# Loading the 'mtcars' dataset from the datasets library
+data("mtcars")
+
+# Convert the following columns to type factor
+ cols <- c("cyl", "vs", "am","gear", "carb")
+ for(i in cols){
+   mtcars[, i] <- sapply(mtcars[, i], as.factor)
+ }
+
+ggpairs(mtcars, 
+  lower = list(
+    continous = "smooth",
+    combo =  "box",
+    discrete = "facetbar"
+  ),
+  diag = list(
+    continous = "densityDiag",
+    discrete = "barDiag"
+  ),
+  upper = "blank"
+)
+
+
+```
+```{r echo=TRUE}
+# Loading the required libraries
+suppressMessages(library(datasets))
+suppressMessages(library(ggplot2))
+suppressMessages(library(GGally))
+
+# Loading the 'mtcars' dataset from the datasets library
+data("mtcars")
+
+# Convert the following columns to type factor
+ cols <- c("cyl", "vs", "am","gear", "carb")
+ for(i in cols){
+   mtcars[, i] <- sapply(mtcars[, i], as.factor)
+ }
+
+ggpairs(mtcars, 
+  lower = list(
+    continous = "smooth",
+    combo =  "box",
+    discrete = "facetbar"
+  ),
+  diag = list(
+    continous = "densityDiag",
+    discrete = "barDiag"
+  ),
+  upper = "blank"
+)
+
+
+```
+
+```{r echo=TRUE}
+
+
+```
+
+
+
+```{r echo=TRUE}
+library(xgboost)
+set.seed(42)
+bound <- floor((nrow(mtcars)/4)*3)         #define % of training and test set
+
+df <- mtcars[sample(nrow(mtcars)), ]           #sample rows 
+df.train <- df[1:bound, ]              #get training set
+df.test <- df[(bound+1):nrow(df), ]    #get test set
+
+result <- xgboost(data = as.matrix(subset(df.train, select = -c(mpg))), label = df.train$mpg,max_depth=4, nrounds = 1000, nthreads = -1, early_stopping_rounds = 50)
+
+xgb.plot.tree(model = result)
+
+
+importance_matrix <- xgb.importance(model = result)
+print(importance_matrix)
+xgb.plot.importance(importance_matrix = importance_matrix)
+```
