@@ -1,11 +1,25 @@
 ---
 title: "Statistical Exploration of Tranmission Type on Miles Per Gallon"
-author: "Shaun"
+author: "S. van der Westhuizen"
 date: "April 10, 2017"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
-# Summary
+# Executive Summary
+
+This analysis was conducted on the mtcars dataset. The dataset was extracted from the 1974 Motor Trend US magazine and comprises of 32 automobiles between 1973 and 1974.
+The purpose of this analysis is to determine:  
+* "Is an automatic or manual transmission better for MPG"  
+* "Quantify the MPG difference between automatic and manual transmissions"  
+
+The analysis below indicates that transmission type does not have a significant impact on MPG. 
+Manual transmissions account for only a 1.8 MPG increase when holding everything else the same.
+
+# Data Exploration
+
+The dataset mtcars consists of a data frame with 32 observations on 11 variables.
 
 ```{r echo=TRUE}
 # Loading the required libraries
@@ -17,12 +31,13 @@ suppressMessages(library(GGally))
 data("mtcars")
 
 # Convert the following columns to type factor
- cols <- c("cyl", "vs", "am","gear", "carb")
- for(i in cols){
-   mtcars[, i] <- sapply(mtcars[, i], as.factor)
- }
+mtcars$cyl <- as.factor(mtcars$cyl)
+mtcars$vs <- as.factor(mtcars$vs)
+mtcars$gear <- as.factor(mtcars$gear)
+mtcars$carb <- as.factor(mtcars$carb)
+mtcars$am <- factor(mtcars$am,labels=c('Automatic','Manual'))
 
-ggpairs(mtcars, 
+ggpairs(mtcars, ggplot2::aes(colour = am), legend = c(2,1), 
   lower = list(
     continous = "smooth",
     combo =  "box",
@@ -34,62 +49,72 @@ ggpairs(mtcars,
   ),
   upper = "blank"
 )
-
-
-```
-```{r echo=TRUE}
-# Loading the required libraries
-suppressMessages(library(datasets))
-suppressMessages(library(ggplot2))
-suppressMessages(library(GGally))
-
-# Loading the 'mtcars' dataset from the datasets library
-data("mtcars")
-
-# Convert the following columns to type factor
- cols <- c("cyl", "vs", "am","gear", "carb")
- for(i in cols){
-   mtcars[, i] <- sapply(mtcars[, i], as.factor)
- }
-
-ggpairs(mtcars, 
-  lower = list(
-    continous = "smooth",
-    combo =  "box",
-    discrete = "facetbar"
-  ),
-  diag = list(
-    continous = "densityDiag",
-    discrete = "barDiag"
-  ),
-  upper = "blank"
-)
-
-
-```
-
-```{r echo=TRUE}
-
-
 ```
 
 
+From the pairs plot above, we can observe a few trends which will be investigated further:  
+1.  The boxplot of MPG ~ am seems to indicate a significant difference  
+2.  Manual transmission tend to cluster towards the higher end of MPG  
+3.  There appears to be relationships between the independant variables which may imply that there may be covariance
+
+
+
+```{r echo=TRUE, fig.width=5, fig.height=3}
+ggplot(mtcars, aes(am, mpg))+
+  geom_boxplot(aes(fill=am))
+```
+```{r echo=TRUE}
+ttest <- t.test(mpg ~ am, mtcars)
+print(ttest)
+```
+
+From the t test above, P = `r ttest$p.value` < 0.05 which implies that their mean difference is not equal to 0 so we can reject the null hypothesis. 
+There is a significant difference between manual and automatic transmissions.
+
+However, we need to investigate it further to understand how much of the variance in MPG is accounted for by the transmission type. 
+
+## Summary by transmission type
+### Manual
+```{r echo=TRUE}
+man<- mtcars[mtcars$am == "Manual",]
+summary(man)
+```
+### Automatic
+```{r echo=TRUE}
+auto<- mtcars[mtcars$am == "Automatic",]
+summary(auto)
+```
+
+From the statistical summarise above, it appears that not only is the MPG for manual transmissions higher, their weight (wt), displacement (disp) and horsepower (hp)
+all appear to be on average lower than the automatic transmissions. It is also worth to note that the number of vehicles per cylinder class is very different as well.
+These factor may be confounding the results of transmission type on MPG.
+
+# Models
 
 ```{r echo=TRUE}
-library(xgboost)
-set.seed(42)
-bound <- floor((nrow(mtcars)/4)*3)         #define % of training and test set
+model1 <- lm(mpg~ am, mtcars)
+model2 <- lm(mpg~ ., mtcars)
+```
 
-df <- mtcars[sample(nrow(mtcars)), ]           #sample rows 
-df.train <- df[1:bound, ]              #get training set
-df.test <- df[(bound+1):nrow(df), ]    #get test set
+Final model selection was performed using stepwise regression using the AIC metric. Cross validation was not considered due to the limited data size. 
+```{r echo=TRUE}
+suppressMessages(library(MASS))
+modelfinal <- stepAIC(model2, trace = 0)
+anova(model1, modelfinal, model2)
+```
 
-result <- xgboost(data = as.matrix(subset(df.train, select = -c(mpg))), label = df.train$mpg,max_depth=4, nrounds = 1000, nthreads = -1, early_stopping_rounds = 50)
+# Conclusion
 
-xgb.plot.tree(model = result)
+The anova summary above establishes that the model as selected through strepwise regression is highly significant and accounts for the greatest reduction in residual sum of squares. The best model fit comprises of the following coefficients:
+```{r echo=TRUE}
+modelfinal$coefficients
+```
 
+This indicates that manual transmissions only account for a 1.8 MPG change above automatic transmissions. This is significantly less than other variables influence on the overall MPG and the mean difference between transmissions types according to the t test above. This is a result of the confounding effects of the other variables. The image in the appendix below highlights the residual plots of the model and confirm the best model fit.
 
-importance_matrix <- xgb.importance(model = result)
-print(importance_matrix)
-xgb.plot.importance(importance_matrix = importance_matrix)
+# Appendix
+## Residual plots for the final model
+```{r echo=TRUE}
+par(mfrow =c(2,2))
+plot(modelfinal)
 ```
